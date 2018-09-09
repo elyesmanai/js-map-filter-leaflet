@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <!--  Include leaflet javascript and css -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet-src.js" crossorigin=""></script>
+  <!--  Include r360.js -->
+  <script src="https://releases.route360.net/r360-js/latest.js"></script>
+
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; font-family: sans-serif; }
+    #map { width: 100%; height: 100%; }
+  </style>
+</head>
+
+<body>
+  <!--  where the map will live  -->
+  <div id="map"></div>
+  
+  <script>
+    $(document).ready(function() {
+
+      var latlons = {
+        map: [36.88,10.33],
+        src1: [36.87,10.37],
+        trg1: [36.7,10.36],
+        trg2: [36.85,10.35],
+        trg3: [36.84,10.34],
+        trg4: [36.83,10.33]
+      };
+
+      // add the map and set the initial center to berlin
+      var map = L.map('map').setView(latlons.map, 12);
+      map.attributionControl.addAttribution("ÖPNV Daten © <a href='https://www.vbb.de/de/index.html' target='_blank'>VBB</a>");
+
+      // initialise the base map
+      r360.basemap({ style: 'bright', apikey: 'SN9QM9UWLHZTAQMHXRHMKO5' }).addTo(map);
+
+      // create a target marker icon to be able to distingush source and targets
+      var redIcon = L.icon({
+        iconUrl: 'http://assets.route360.net/leaflet-extras/marker-icon-red.png',
+        shadowUrl: 'http://assets.route360.net/leaflet-extras/marker-shadow.png',
+        iconAnchor: [12, 45],
+        popupAnchor: [0, -35]
+      });
+
+      // create a source and target markers and add them to the map
+      var sourceMarker1 = L.marker(latlons.src1, { draggable : true }).addTo(map);
+      var targetMarker1 = L.marker(latlons.trg1, { icon: redIcon, draggable : true }).addTo(map);
+      var targetMarker2 = L.marker(latlons.trg2, { icon: redIcon, draggable : true }).addTo(map);
+      var targetMarker3 = L.marker(latlons.trg3, { icon: redIcon, draggable : true }).addTo(map);
+      var targetMarker4 = L.marker(latlons.trg4, { icon: redIcon, draggable : true }).addTo(map);
+
+      // add a layer in which we will paint the route
+      var walkRouteLayer = L.featureGroup().addTo(map);
+      var transitRouteLayer = L.featureGroup().addTo(map);
+
+      // you need to define some options for the routing service
+      // for more travel options check out the other tutorials
+      var travelOptions = r360.travelOptions();
+      // please contact us and request your own key
+      travelOptions.setServiceKey('SN9QM9UWLHZTAQMHXRHMKO5');
+      // set the service url for your area
+      travelOptions.setServiceUrl('https://service.route360.net/africa/');
+      travelOptions.addSource(sourceMarker1);
+      travelOptions.setTargets([targetMarker1, targetMarker2, targetMarker3]);
+      travelOptions.setTravelType('transit');
+
+      var routeTransit = function(){
+
+        transitRouteLayer.clearLayers();
+
+        // start the service
+        r360.RouteService.getRoutes(travelOptions, function(routes) {
+
+          // paint a route with overwritten colors for transit segments and walk segments
+          // and custom transfer segments
+          r360.LeafletUtil.fadeIn(transitRouteLayer, routes[0], 1000, "travelDistance", {
+            color: '#FF0600',
+            transferColor: '#FF9A33',
+            transferHaloColor: '#FFFFFF',
+            transferFillOpacity: 1,
+            transferOpacity: 1,
+            transferStroke: true,
+            transferWeight: 10,
+            transferRadius: 15
+                // paintTransfer : true --> is the default
+          });
+
+          // overwrite transit color, let walk be default color
+          r360.LeafletUtil.fadeIn(transitRouteLayer, routes[1], 1000, "travelDistance", {
+            color: '#156ab8',
+            haloColor: 'white',
+            paintTransfer: true
+          });
+          // no fade in and no markers inbetween segments
+          r360.LeafletUtil.fadeIn(transitRouteLayer, routes[2], 0, "travelDistance", {
+            color: '#006F35',
+            haloColor: 'white',
+            paintTransfer: false
+          });
+        });
+      }
+
+      var routeWalk = function(){
+
+        walkRouteLayer.clearLayers();
+
+        var travelOptions = r360.travelOptions();
+        travelOptions.addSource(sourceMarker1);
+        travelOptions.addTarget(targetMarker4);
+        travelOptions.setTravelType('walk');
+        // set the service API-key, this is a demo key
+        // please contact us and request your own key
+        travelOptions.setServiceKey('YWtKiQB7MiZETbCoVsG6');
+        travelOptions.setServiceUrl('https://service.route360.net/africa/');
+
+        // start the service
+        r360.RouteService.getRoutes(travelOptions, function(routes) {
+
+          var crazyOptions = {
+              opacity: 0.9,
+              weight: 8,
+              walkColor: '#D34AFC',
+              walkWeight: 4,
+              walkDashArray: '3, 10', // use this option to disable dashing: '1'
+              haloColor: '#FCC0AC',
+              haloOpacity: 0.5,
+              haloWeight: 14
+          }
+
+          r360.LeafletUtil.fadeIn(walkRouteLayer, routes[0], 1000, "travelDistance", crazyOptions);
+        });
+      }
+
+      routeWalk();
+      routeTransit();
+
+      sourceMarker1.on('dragend', function(){ routeTransit(); routeWalk(); });
+      targetMarker1.on('dragend', function(){ routeTransit(); });
+      targetMarker2.on('dragend', function(){ routeTransit(); });
+      targetMarker3.on('dragend', function(){ routeTransit(); });
+      targetMarker4.on('dragend', function(){ routeWalk(); });
+
+    });
+  </script>
+</body>
+</html>
